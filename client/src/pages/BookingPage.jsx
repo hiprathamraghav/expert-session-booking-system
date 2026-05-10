@@ -141,7 +141,7 @@ export default function BookingPage() {
     }
   }
 
-  if (!expert && !pageError) {
+  if (!expert?.slotGroups && !pageError) {
     return <LoadingState label="Loading booking form" />;
   }
 
@@ -149,7 +149,7 @@ export default function BookingPage() {
     return <ErrorState message={pageError} onRetry={loadExpert} />;
   }
 
-  return expert ? (
+  return expert?.slotGroups ? (
     <section className="page">
       <Link className="back-link" to={`/experts/${id}`}>
         <ArrowLeft size={18} />

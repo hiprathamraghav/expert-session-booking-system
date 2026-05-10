@@ -49,7 +49,7 @@ export default function ExpertDetailPage() {
     };
   }, [id, markSlotBooked]);
 
-  if (!expert && !error) {
+  if (!expert?.slotGroups && !error) {
     return <LoadingState label="Loading expert details" />;
   }
 
@@ -57,7 +57,7 @@ export default function ExpertDetailPage() {
     return <ErrorState message={error} onRetry={loadExpert} />;
   }
 
-  return expert ? (
+  return expert?.slotGroups ? (
     <section className="page">
       <Link className="back-link" to="/">
         <ArrowLeft size={18} />
