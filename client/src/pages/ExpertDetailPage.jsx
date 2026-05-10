@@ -49,7 +49,7 @@ export default function ExpertDetailPage() {
     };
   }, [id, markSlotBooked]);
 
-  if (loading && !expert) {
+  if (!expert && !error) {
     return <LoadingState label="Loading expert details" />;
   }
 

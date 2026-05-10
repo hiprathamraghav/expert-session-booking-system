@@ -141,7 +141,7 @@ export default function BookingPage() {
     }
   }
 
-  if (loading && !expert) {
+  if (!expert && !pageError) {
     return <LoadingState label="Loading booking form" />;
   }
 
