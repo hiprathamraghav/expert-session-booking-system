@@ -2,6 +2,7 @@
   "name": "expert-session-booking-system",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "description": "Real-time expert session booking system with React, Express, MongoDB, and Socket.io.",
   "scripts": {
     "install:all": "npm install --workspaces",
