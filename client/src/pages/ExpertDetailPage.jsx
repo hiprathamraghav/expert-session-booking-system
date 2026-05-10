@@ -1,40 +1,33 @@
 import React from "react";
 import { ArrowLeft, BriefcaseBusiness, CalendarCheck, Star } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, getErrorMessage } from "../api/client.js";
 import { getSocket } from "../api/socket.js";
 import ErrorState from "../components/ErrorState.jsx";
 import LoadingState from "../components/LoadingState.jsx";
+import { useExpertStore } from "../store/expertStore.js";
 
 export default function ExpertDetailPage() {
   const { id } = useParams();
-  const [expert, setExpert] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const expert = useExpertStore((state) => state.expertById[id]);
+  const loading = useExpertStore((state) => state.expertLoading[id]);
+  const error = useExpertStore((state) => state.expertErrors[id]);
+  const fetchExpert = useExpertStore((state) => state.fetchExpert);
+  const markSlotBooked = useExpertStore((state) => state.markSlotBooked);
 
   const loadExpert = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
     try {
-      const response = await api.get(`/experts/${id}`);
-      setExpert(response.data.data);
-    } catch (requestError) {
-      setError(getErrorMessage(requestError));
-    } finally {
-      setLoading(false);
+      await fetchExpert(id);
+    } catch {
+      // The store owns the user-facing error message.
     }
-  }, [id]);
+  }, [fetchExpert, id]);
 
   useEffect(() => {
-    loadExpert();
-  }, [loadExpert]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(loadExpert, 5000);
-    return () => window.clearInterval(intervalId);
-  }, [loadExpert]);
+    if (!expert?.slotGroups) {
+      loadExpert();
+    }
+  }, [expert, loadExpert]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -45,23 +38,7 @@ export default function ExpertDetailPage() {
         return;
       }
 
-      setExpert((current) => {
-        if (!current) {
-          return current;
-        }
-
-        return {
-          ...current,
-          slotGroups: current.slotGroups.map((group) => ({
-            ...group,
-            slots: group.slots.map((slot) =>
-              group.date === payload.date && slot.time === payload.timeSlot
-                ? { ...slot, booked: true }
-                : slot
-            )
-          }))
-        };
-      });
+      markSlotBooked(payload);
     }
 
     socket.on("slotBooked", handleSlotBooked);
@@ -70,9 +47,9 @@ export default function ExpertDetailPage() {
       socket.emit("leaveExpert", id);
       socket.off("slotBooked", handleSlotBooked);
     };
-  }, [id]);
+  }, [id, markSlotBooked]);
 
-  if (loading) {
+  if (loading && !expert) {
     return <LoadingState label="Loading expert details" />;
   }
 
@@ -80,7 +57,7 @@ export default function ExpertDetailPage() {
     return <ErrorState message={error} onRetry={loadExpert} />;
   }
 
-  return (
+  return expert ? (
     <section className="page">
       <Link className="back-link" to="/">
         <ArrowLeft size={18} />
@@ -134,7 +111,7 @@ export default function ExpertDetailPage() {
         </section>
       </div>
     </section>
-  );
+  ) : null;
 }
 
 function formatDate(date) {

@@ -1,55 +1,29 @@
 import React from "react";
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Star } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getErrorMessage } from "../api/client.js";
 import EmptyState from "../components/EmptyState.jsx";
 import ErrorState from "../components/ErrorState.jsx";
 import LoadingState from "../components/LoadingState.jsx";
-
-const pageSize = 6;
+import { useExpertStore } from "../store/expertStore.js";
 
 export default function ExpertListPage() {
-  const [experts, setExperts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [page, setPage] = useState(1);
-  const [meta, setMeta] = useState({ page: 1, totalPages: 1, total: 0 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const loadExperts = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await api.get("/experts", {
-        params: {
-          page,
-          limit: pageSize,
-          search: search || undefined,
-          category: category || undefined
-        }
-      });
-      setExperts(response.data.data);
-      setMeta(response.data.meta);
-      setCategories(response.data.categories || []);
-    } catch (requestError) {
-      setError(getErrorMessage(requestError));
-    } finally {
-      setLoading(false);
-    }
-  }, [category, page, search]);
+  const experts = useExpertStore((state) => state.experts);
+  const categories = useExpertStore((state) => state.categories);
+  const meta = useExpertStore((state) => state.meta);
+  const query = useExpertStore((state) => state.listQuery);
+  const loading = useExpertStore((state) => state.listLoading);
+  const error = useExpertStore((state) => state.listError);
+  const fetchExperts = useExpertStore((state) => state.fetchExperts);
+  const [draftSearch, setDraftSearch] = useState(query.search);
 
   useEffect(() => {
-    loadExperts();
-  }, [loadExperts]);
+    fetchExperts();
+  }, [fetchExperts]);
 
   function handleSearchSubmit(event) {
     event.preventDefault();
-    setPage(1);
-    loadExperts();
+    fetchExperts({ search: draftSearch, page: 1 });
   }
 
   return (
@@ -65,10 +39,9 @@ export default function ExpertListPage() {
         <label>
           <span>Search by name</span>
           <input
-            value={search}
+            value={draftSearch}
             onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
+              setDraftSearch(event.target.value);
             }}
             placeholder="Search experts"
           />
@@ -76,10 +49,9 @@ export default function ExpertListPage() {
         <label>
           <span>Category</span>
           <select
-            value={category}
+            value={query.category}
             onChange={(event) => {
-              setCategory(event.target.value);
-              setPage(1);
+              fetchExperts({ category: event.target.value, page: 1 });
             }}
           >
             <option value="">All categories</option>
@@ -96,7 +68,7 @@ export default function ExpertListPage() {
       </form>
 
       {loading ? <LoadingState label="Loading experts" /> : null}
-      {error ? <ErrorState message={error} onRetry={loadExperts} /> : null}
+      {error ? <ErrorState message={error} onRetry={() => fetchExperts()} /> : null}
 
       {!loading && !error && experts.length === 0 ? (
         <EmptyState title="No experts found" message="Try a different search or category." />
@@ -134,7 +106,7 @@ export default function ExpertListPage() {
               className="icon-button"
               type="button"
               disabled={meta.page <= 1}
-              onClick={() => setPage((current) => Math.max(current - 1, 1))}
+              onClick={() => fetchExperts({ page: Math.max(query.page - 1, 1) })}
               aria-label="Previous page"
               title="Previous page"
             >
@@ -147,9 +119,7 @@ export default function ExpertListPage() {
               className="icon-button"
               type="button"
               disabled={meta.page >= meta.totalPages}
-              onClick={() =>
-                setPage((current) => Math.min(current + 1, meta.totalPages))
-              }
+              onClick={() => fetchExperts({ page: Math.min(query.page + 1, meta.totalPages) })}
               aria-label="Next page"
               title="Next page"
             >

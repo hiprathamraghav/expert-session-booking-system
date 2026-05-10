@@ -6,6 +6,7 @@ import { api, getErrorMessage } from "../api/client.js";
 import { getSocket } from "../api/socket.js";
 import ErrorState from "../components/ErrorState.jsx";
 import LoadingState from "../components/LoadingState.jsx";
+import { useExpertStore } from "../store/expertStore.js";
 
 const initialForm = {
   name: "",
@@ -18,42 +19,35 @@ const initialForm = {
 
 export default function BookingPage() {
   const { id } = useParams();
-  const [expert, setExpert] = useState(null);
+  const expert = useExpertStore((state) => state.expertById[id]);
+  const loading = useExpertStore((state) => state.expertLoading[id]);
+  const pageError = useExpertStore((state) => state.expertErrors[id]);
+  const fetchExpert = useExpertStore((state) => state.fetchExpert);
+  const markSlotBooked = useExpertStore((state) => state.markSlotBooked);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [pageError, setPageError] = useState("");
   const [success, setSuccess] = useState("");
 
   const loadExpert = useCallback(async () => {
-    setLoading(true);
-    setPageError("");
-
     try {
-      const response = await api.get(`/experts/${id}`);
-      setExpert(response.data.data);
-      const firstOpenSlot = findFirstOpenSlot(response.data.data.slotGroups);
+      const nextExpert = await fetchExpert(id);
+      const firstOpenSlot = findFirstOpenSlot(nextExpert.slotGroups);
       setForm((current) => ({
         ...current,
         date: current.date || firstOpenSlot?.date || "",
         timeSlot: current.timeSlot || firstOpenSlot?.time || ""
       }));
-    } catch (requestError) {
-      setPageError(getErrorMessage(requestError));
-    } finally {
-      setLoading(false);
+    } catch {
+      // The store owns the user-facing error message.
     }
-  }, [id]);
+  }, [fetchExpert, id]);
 
   useEffect(() => {
-    loadExpert();
-  }, [loadExpert]);
-
-  useEffect(() => {
-    const intervalId = window.setInterval(loadExpert, 5000);
-    return () => window.clearInterval(intervalId);
-  }, [loadExpert]);
+    if (!expert?.slotGroups) {
+      loadExpert();
+    }
+  }, [expert, loadExpert]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -64,23 +58,7 @@ export default function BookingPage() {
         return;
       }
 
-      setExpert((current) => {
-        if (!current) {
-          return current;
-        }
-
-        return {
-          ...current,
-          slotGroups: current.slotGroups.map((group) => ({
-            ...group,
-            slots: group.slots.map((slot) =>
-              group.date === payload.date && slot.time === payload.timeSlot
-                ? { ...slot, booked: true }
-                : slot
-            )
-          }))
-        };
-      });
+      markSlotBooked(payload);
     }
 
     socket.on("slotBooked", handleSlotBooked);
@@ -89,7 +67,7 @@ export default function BookingPage() {
       socket.emit("leaveExpert", id);
       socket.off("slotBooked", handleSlotBooked);
     };
-  }, [id]);
+  }, [id, markSlotBooked]);
 
   const selectedDateSlots = useMemo(() => {
     return expert?.slotGroups.find((group) => group.date === form.date)?.slots || [];
@@ -150,7 +128,7 @@ export default function BookingPage() {
       });
       setSuccess(response.data.message || "Booking created successfully.");
       setForm((current) => ({ ...initialForm, email: current.email }));
-      await loadExpert();
+      await fetchExpert(id, { silent: true });
     } catch (requestError) {
       const responseErrors = requestError.response?.data?.details;
       if (responseErrors) {
@@ -163,7 +141,7 @@ export default function BookingPage() {
     }
   }
 
-  if (loading) {
+  if (loading && !expert) {
     return <LoadingState label="Loading booking form" />;
   }
 
@@ -171,7 +149,7 @@ export default function BookingPage() {
     return <ErrorState message={pageError} onRetry={loadExpert} />;
   }
 
-  return (
+  return expert ? (
     <section className="page">
       <Link className="back-link" to={`/experts/${id}`}>
         <ArrowLeft size={18} />
@@ -283,7 +261,7 @@ export default function BookingPage() {
         </form>
       </div>
     </section>
-  );
+  ) : null;
 }
 
 function Field({ label, error, children }) {
