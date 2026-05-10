@@ -50,6 +50,7 @@ Required Vercel environment variables:
 
 ```bash
 MONGO_URI=your-mongodb-atlas-connection-string
+# or MONGODB_URI if created by the Vercel MongoDB Atlas integration
 CLIENT_URL=https://your-vercel-domain.vercel.app
 ```
 
