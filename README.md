@@ -2,6 +2,8 @@
 
 Full-stack booking app built with React, Node.js, Express, MongoDB, Mongoose, and Socket.io.
 
+Live site: https://expert-session-booking-system-six.vercel.app
+
 ## Setup
 
 1. Install dependencies:
